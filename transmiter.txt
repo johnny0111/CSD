@@ -1,0 +1,115 @@
+----------------------------------------------------------------------------------
+-- Company: 
+-- Engineer: 
+-- 
+-- Create Date:    12:54:01 10/21/2020 
+-- Design Name: 
+-- Module Name:    Transmiter - Behavioral 
+-- Project Name: 
+-- Target Devices: 
+-- Tool versions: 
+-- Description: 
+--
+-- Dependencies: 
+--
+-- Revision: 
+-- Revision 0.01 - File Created
+-- Additional Comments: 
+--
+----------------------------------------------------------------------------------
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.STD_LOGIC_ARITH.ALL;
+use IEEE.STD_LOGIC_UNSIGNED.ALL;-- Uncomment the following library declaration if using
+-- arithmetic functions with Signed or Unsigned values
+use IEEE.NUMERIC_STD.ALL;
+
+-- Uncomment the following library declaration if instantiating
+-- any Xilinx primitives in this code.
+--library UNISIM;
+--use UNISIM.VComponents.all;
+
+entity TXUART is
+    Port ( Transmit : in  STD_LOGIC;
+			  Load : in STD_LOGIC;
+           Data : in  STD_LOGIC_VECTOR (7 downto 0);
+           Tx : out  STD_LOGIC := '1';
+           clk : in  STD_LOGIC);
+end TXUART;
+
+architecture Behavioral of TXUART is
+	signal TxArray : STD_LOGIC_VECTOR(9 downto 0) := "0000000000" ;
+	signal count, index : INTEGER := 0;
+	constant clkperbit : INTEGER := 5208;
+	signal trans : STD_LOGIC := '0';
+	signal transmit_hold, transmit_hold_aux, done, load_hold, load_hold_aux : STD_LOGIC := '0';
+begin
+
+	
+
+	--Load dos dados da placa 
+	LoadData : process (clk)
+	begin
+		if clk'event and clk = '1' then
+			if Load = '1' then
+				TxArray(0) <= '0';
+				TxArray(1) <= Data(0);
+				TxArray(2) <= Data(1);
+				TxArray(3) <= Data(2);
+				TxArray(4) <= Data(3);
+				TxArray(5) <= Data(4);
+				TxArray(6) <= Data(5);
+				TxArray(7) <= Data(6);
+				TxArray(8) <= Data(7);
+				TxArray(9) <= '1';
+			end if;
+		end if;
+	end process LoadData;
+	
+	--Gerador de sinal permanente para transmitir dados
+	TransmissionSignal : process(clk)
+	begin
+		if clk'event and clk = '1' then
+			if Transmit = '1' then
+				transmit_hold <= '1';
+				if done = '1' then
+					transmit_hold <= '0';
+				end if;
+			end if;
+		end if;
+	end process TransmissionSignal;
+	
+	transmit_hold_aux <= '1' when transmit_hold = '1' else '0';
+	
+	--Adaptacao do clock para a velocidade do protocolo UART9600 bits/s
+	TransmissionRate : process (clk)
+	begin
+		if clk'event and clk = '1' then
+			if transmit_hold_aux = '1' then
+				if count = (clkperbit - 1) then
+					count <= 0;
+				else count <= count + 1;
+				end if;	
+			end if;
+		end if;
+	end process TransmissionRate;
+	
+	trans <= '1' when count = (clkperbit - 1) else '0';
+	
+	--Transmissao de dados
+	Transmission : process(clk)
+	begin
+		if clk'event and clk = '1' then
+			if trans = '1' then
+				if index = 9 then
+					index <= 0;
+				else index <= index + 1;
+				end if;
+			end if;
+		end if;
+	end process Transmission;
+	done <= '1' when index = 9 else '0';
+	Tx <= TxArray(index) when transmit_hold_aux = '1' else '1';
+end Behavioral;
+
+
